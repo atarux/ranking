@@ -22,10 +22,13 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; }
+/* iOS 26 colora la barra di stato con il background-color pieno della pagina (non con la sfumatura). */
+html { background-color: #2f6bea; }
 body {
   font-family: var(--font);
   color: var(--ink);
-  background:
+  background-color: #2f6bea;
+  background-image:
     repeating-conic-gradient(from 0deg at 50% -8%, rgba(255,255,255,.07) 0 6deg, transparent 6deg 14deg),
     linear-gradient(180deg, #2f6bea 0%, #5b8ff5 45%, #a9c8ff 100%);
   background-attachment: fixed;
