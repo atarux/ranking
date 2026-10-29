@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Classifica">
+  <meta name="theme-color" content="#6f66e8">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <title>Classifica</title>
+</head>
+<body>
+  <main id="main">
+
+    <!-- CLASSIFICA -->
+    <section class="view active" id="view-ranking" data-view="ranking">
+      <div class="board">
+        <div class="medal" aria-hidden="true">
+          <svg viewBox="0 0 64 64"><path d="M20 12h24v8c0 9-5 15-12 15s-12-6-12-15z" fill="#fff"/><path d="M20 15h-6c0 7 3 11 8 12M44 15h6c0 7-3 11-8 12" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><rect x="29" y="34" width="6" height="7" fill="#fff"/><rect x="22" y="41" width="20" height="6" rx="3" fill="#fff"/></svg>
+        </div>
+        <div class="board-head">
+          <h1 class="display">Classifica</h1>
+          <p class="board-title" id="boardTitle"></p>
+          <hr>
+          <p class="board-meta" id="boardMeta"></p>
+        </div>
+        <ol class="rank-list" id="rankList"></ol>
+      </div>
+    </section>
+
+    <!-- STATISTICHE -->
+    <section class="view" id="view-stats" data-view="stats">
+      <header class="page-head"><h2 class="display">Statistiche</h2></header>
+      <div id="statsBody"></div>
+    </section>
+
+    <!-- MODIFICA -->
+    <section class="view" id="view-edit" data-view="edit">
+      <header class="page-head"><h2 class="display">Modifica</h2></header>
+      <div class="card">
+        <label class="field">
+          <span>Nome della classifica</span>
+          <input id="titleInput" type="text" maxlength="40" autocomplete="off">
+        </label>
+      </div>
+      <h3 class="section-label">Giocatori</h3>
+      <div id="editPlayers"></div>
+      <h3 class="section-label">Dati</h3>
+      <div class="card actions-list">
+        <button class="list-btn" id="btnExport">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12m0-12 4 4m-4-4-4 4M5 14v5h14v-5"/></svg>Esporta backup
+        </button>
+        <button class="list-btn" id="btnImport">
+          <svg viewBox="0 0 24 24"><path d="M12 15V3m0 12 4-4m-4 4-4-4M5 14v5h14v-5"/></svg>Importa backup
+        </button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+        <button class="list-btn danger" id="btnReset">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Azzera punteggi e storico
+        </button>
+      </div>
+    </section>
+
+    <!-- CONDIVIDI -->
+    <section class="view" id="view-share" data-view="share">
+      <header class="page-head"><h2 class="display">Condividi</h2></header>
+      <div class="share-preview"><img id="shareImg" alt="Anteprima classifica"></div>
+      <div class="share-actions">
+        <button class="btn primary" id="btnShareImg">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12m0-12 4 4m-4-4-4 4M5 12v7h14v-7"/></svg>Condividi immagine
+        </button>
+        <button class="btn" id="btnShareText">Condividi come testo</button>
+        <button class="btn ghost" id="btnCopy">Copia testo</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- BARRA AZIONI -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab active" data-go="ranking">
+      <svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4c0 3 1.5 5 3.5 5M17 6h3c0 3-1.5 5-3.5 5"/></svg>
+      <span>Classifica</span>
+    </button>
+    <button class="tab" data-go="stats">
+      <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      <span>Statistiche</span>
+    </button>
+    <button class="tab tab-main" id="btnUpdate" aria-label="Aggiorna punti">
+      <span class="fab"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+      <span>Aggiorna</span>
+    </button>
+    <button class="tab" data-go="edit">
+      <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg>
+      <span>Modifica</span>
+    </button>
+    <button class="tab" data-go="share">
+      <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6"/></svg>
+      <span>Condividi</span>
+    </button>
+  </nav>
+
+  <!-- SHEET: AGGIORNA PUNTI -->
+  <div class="sheet" id="sheetUpdate" aria-hidden="true">
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-labelledby="updTitle">
+      <div class="sheet-grip"></div>
+      <div class="sheet-head">
+        <button class="link" data-close>Annulla</button>
+        <h3 id="updTitle">Nuovo round</h3>
+        <button class="link strong" id="btnSaveRound">Salva</button>
+      </div>
+      <p class="sheet-hint">Inserisci i punti guadagnati in questo round (usa ± per sottrarre).</p>
+      <div id="updRows"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: AVATAR -->
+  <div class="sheet" id="sheetAvatar" aria-hidden="true">
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-labelledby="avTitle">
+      <div class="sheet-grip"></div>
+      <div class="sheet-head">
+        <span></span>
+        <h3 id="avTitle">Avatar</h3>
+        <button class="link strong" data-close>Fine</button>
+      </div>
+      <div class="av-preview" id="avPreview"></div>
+      <label class="btn photo-btn">
+        <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        Scegli una foto
+        <input type="file" id="avFile" accept="image/*" hidden>
+      </label>
+      <h4 class="section-label">Emoji</h4>
+      <div class="emoji-grid" id="emojiGrid"></div>
+      <h4 class="section-label">Colore</h4>
+      <div class="color-row" id="colorRow"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

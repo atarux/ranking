@@ -1,0 +1,17 @@
+{
+  "name": "Classifica",
+  "short_name": "Classifica",
+  "description": "Classifica di 4 giocatori con punti, statistiche e condivisione",
+  "lang": "it",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#948cfb",
+  "theme_color": "#6f66e8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
