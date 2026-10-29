@@ -5,7 +5,7 @@
 const STORE_KEY = 'classifica.v1';
 const VER_KEY = 'classifica.versione';
 const PIN_KEY = 'classifica.pin';
-const APP_VERSION = 14;
+const APP_VERSION = 15;
 
 // Database condiviso su Supabase (tabelle e funzioni in supabase.sql).
 // La chiave "publishable" è fatta per stare nel codice pubblico: i dati li protegge il PIN.
@@ -873,8 +873,19 @@ async function renderShareImage() {
     }
     ctx.restore();
     if (first) {
-      ctx.font = '54px "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('👑', ax, mid - ar - 14);
+      // Stessa corona della classifica (CROWN), in scala con l'avatar.
+      const k = ar * 2 / 56 * 26 / 24;
+      ctx.save();
+      ctx.translate(ax, mid - ar - 6.3 * ar * 2 / 56);
+      ctx.rotate(-8 * Math.PI / 180);
+      ctx.scale(k, k);
+      ctx.translate(-12, -8);
+      ctx.shadowColor = 'rgba(0,0,0,.2)'; ctx.shadowBlur = 2 * k; ctx.shadowOffsetY = 2 * k;
+      const crown = new Path2D('M2 14 3.5 4l5 4.5L12 1l3.5 7.5 5-4.5L22 14z');
+      ctx.fillStyle = '#f5b82e'; ctx.fill(crown);
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4; ctx.lineJoin = 'round'; ctx.stroke(crown);
+      ctx.restore();
     }
 
     ctx.fillStyle = ink; ctx.textAlign = 'left';
