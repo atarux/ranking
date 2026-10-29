@@ -5,7 +5,7 @@
 const STORE_KEY = 'classifica.v1';
 const VER_KEY = 'classifica.versione';
 const PIN_KEY = 'classifica.pin';
-const APP_VERSION = 15;
+const APP_VERSION = 16;
 
 // Database condiviso su Supabase (tabelle e funzioni in supabase.sql).
 // La chiave "publishable" è fatta per stare nel codice pubblico: i dati li protegge il PIN.
@@ -147,6 +147,7 @@ async function push() {
       version = out.versione;
       base = snap;
       pending.splice(0, sent);
+      warnedDown = false;
       saveLocal();
     }
   } catch (e) {
@@ -156,7 +157,7 @@ async function push() {
     state = JSON.parse(base);
     saveLocal();
     renderAll();
-    syncError(e, 'Nessuna connessione: modifica non salvata');
+    syncError(e, true);
   }
 }
 
@@ -164,6 +165,7 @@ async function pull() {
   if (!pin || syncing || pending.length) return;
   try {
     const out = await rpc('leggi_classifica', { p_pin: pin });
+    warnedDown = false;
     if (syncing || pending.length) return; // nel frattempo è partita una modifica: vince quella
     if (!isValidState(out.dati)) {
       // Server ancora vuoto: si parte dalla classifica di questo telefono.
@@ -173,19 +175,27 @@ async function pull() {
       applyServer(out.dati, out.versione);
     }
   } catch (e) {
-    syncError(e); // offline si continua a vedere la copia locale
+    syncError(e); // intanto si continua a vedere la copia locale
   }
 }
 
-function syncError(e, offlineMsg) {
+// Telefono online ma server muto: di solito il progetto Supabase gratuito
+// è andato in pausa per inattività e va riattivato dalla dashboard.
+const SERVER_DOWN = 'Il server non risponde, forse è in pausa: riattivalo su supabase.com';
+let warnedDown = false;
+
+function syncError(e, changeLost = false) {
   if (e.code === 'pin') {
     pin = null;
     localStorage.removeItem(PIN_KEY);
     askPin('Il PIN è cambiato: inseriscilo di nuovo');
   } else if (e.code === 'troppi_tentativi') {
     toast('Troppi PIN sbagliati: riprova tra 15 minuti');
-  } else if (offlineMsg) {
-    toast(offlineMsg);
+  } else if (!navigator.onLine) {
+    if (changeLost) toast('Nessuna connessione: modifica non salvata');
+  } else if (changeLost || !warnedDown) {
+    warnedDown = true;
+    toast(changeLost ? `Modifica non salvata. ${SERVER_DOWN}` : SERVER_DOWN, 6000);
   }
 }
 
@@ -215,7 +225,7 @@ $('#pinForm').addEventListener('submit', async e => {
     $('#pinError').textContent =
       err.code === 'pin' ? 'PIN sbagliato' :
       err.code === 'troppi_tentativi' ? 'Troppi tentativi: riprova tra 15 minuti' :
-      'Nessuna connessione: riprova';
+      navigator.onLine ? SERVER_DOWN : 'Nessuna connessione: riprova';
   } finally {
     btn.disabled = false;
   }
@@ -319,12 +329,12 @@ const LAUREL = (() => {
 })();
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms = 2200) {
   const el = $('#toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
 /* ================== Classifica ================== */

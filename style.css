@@ -372,8 +372,8 @@ main {
   bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 22px);
   transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
   background: rgba(15, 25, 60, .92); color: #fff;
-  padding: 11px 18px; border-radius: 99px; font-weight: 600; font-size: 14.5px;
-  max-width: calc(100% - 40px); text-align: center;
+  padding: 11px 18px; border-radius: 22px; font-weight: 600; font-size: 14.5px;
+  width: max-content; max-width: min(420px, calc(100% - 40px)); text-align: center;
   transition: opacity .25s, transform .25s;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
