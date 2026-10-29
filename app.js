@@ -3,7 +3,7 @@
 /* ================== Dati ================== */
 
 const STORE_KEY = 'classifica.v1';
-const APP_VERSION = 6;
+const APP_VERSION = 7;
 const COLORS = ['#8b7cf6', '#f472b6', '#38bdf8', '#f59e0b', '#34d399', '#fb7185', '#a3e635', '#94a3b8'];
 const EMOJIS = ['🦊', '🐼', '🐯', '🐸', '🐨', '🦁', '🐵', '🐙', '🦄', '🐶', '🐱', '🐻', '🐰', '🐲', '🐧', '🦉',
   '👑', '🚀', '🔥', '⭐️', '⚽️', '🏀', '🎯', '🎲', '🎸', '🍕', '🌵', '👻', '🤖', '😎', '🥷', '🧙'];
@@ -11,14 +11,17 @@ const EMOJIS = ['🦊', '🐼', '🐯', '🐸', '🐨', '🦁', '🐵', '🐙', 
 const $ = (sel, el = document) => el.querySelector(sel);
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+const DEFAULT_TITLE = '2026/2027';
+const DEFAULT_NAMES = ['Marco', 'Muzzi', 'Paola', 'Puddu'];
+
 function defaultState() {
   return {
-    title: 'La nostra sfida',
+    title: DEFAULT_TITLE,
     players: [
-      { id: uid(), name: 'Giocatore 1', emoji: '🦊', color: COLORS[0], photo: null },
-      { id: uid(), name: 'Giocatore 2', emoji: '🐼', color: COLORS[1], photo: null },
-      { id: uid(), name: 'Giocatore 3', emoji: '🐯', color: COLORS[2], photo: null },
-      { id: uid(), name: 'Giocatore 4', emoji: '🐸', color: COLORS[3], photo: null },
+      { id: uid(), name: DEFAULT_NAMES[0], emoji: '🦊', color: COLORS[0], photo: null },
+      { id: uid(), name: DEFAULT_NAMES[1], emoji: '🐼', color: COLORS[1], photo: null },
+      { id: uid(), name: DEFAULT_NAMES[2], emoji: '🐯', color: COLORS[2], photo: null },
+      { id: uid(), name: DEFAULT_NAMES[3], emoji: '🐸', color: COLORS[3], photo: null },
     ],
     // Ogni voce: { id, ts, type: 'round' | 'adjust', deltas: { [playerId]: number } }
     // I punti di un giocatore sono sempre la somma dei suoi delta.
@@ -39,7 +42,18 @@ function load() {
   return defaultState();
 }
 
+// Sostituisce i vecchi valori di esempio con quelli nuovi, senza toccare ciò che l'utente ha già cambiato.
+function migrateDefaults(s) {
+  let changed = false;
+  if (s.title === 'La nostra sfida') { s.title = DEFAULT_TITLE; changed = true; }
+  s.players.forEach((p, i) => {
+    if (p.name === `Giocatore ${i + 1}` && DEFAULT_NAMES[i]) { p.name = DEFAULT_NAMES[i]; changed = true; }
+  });
+  return changed;
+}
+
 let state = load();
+if (migrateDefaults(state)) save();
 
 function save() {
   try {
