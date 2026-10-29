@@ -10,8 +10,8 @@ const APP_VERSION = 12;
 // Database condiviso su Supabase (tabelle e funzioni in supabase.sql).
 // La chiave "publishable" è fatta per stare nel codice pubblico: i dati li protegge il PIN.
 // Se restano vuoti, i dati stanno solo su questo telefono.
-const SUPABASE_URL = '';
-const SUPABASE_KEY = '';
+const SUPABASE_URL = 'https://mdxogalrfifgiebqqvhh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_lNg2oEL_S25oQPVVZA73qw_HJep55Jo';
 const CLOUD = Boolean(SUPABASE_URL && SUPABASE_KEY);
 const COLORS = ['#8b7cf6', '#f472b6', '#38bdf8', '#f59e0b', '#34d399', '#fb7185', '#a3e635', '#94a3b8'];
 const EMOJIS = ['🦊', '🐼', '🐯', '🐸', '🐨', '🦁', '🐵', '🐙', '🦄', '🐶', '🐱', '🐻', '🐰', '🐲', '🐧', '🦉',
