@@ -242,6 +242,8 @@ main {
 .list-btn.danger { color: var(--danger); }
 .list-btn.danger svg { stroke: var(--danger); }
 
+.app-version { text-align: center; color: rgba(255,255,255,.8); font-size: 13px; font-weight: 600; margin: 18px 0 0; }
+
 /* Condividi */
 .share-preview { background: rgba(255,255,255,.25); border-radius: var(--radius); padding: 10px; }
 .share-preview img { width: 100%; display: block; border-radius: 16px; box-shadow: 0 14px 34px rgba(20, 50, 130,.3); aspect-ratio: 4 / 5; background: rgba(255,255,255,.3); }
