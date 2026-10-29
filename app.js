@@ -542,7 +542,7 @@ async function renderShareImage() {
   await document.fonts?.load?.('700 96px Fredoka').catch(() => {});
 
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, '#6f66e8'); bg.addColorStop(.5, '#948cfb'); bg.addColorStop(1, '#b9bcff');
+  bg.addColorStop(0, '#2f6bea'); bg.addColorStop(.5, '#5b8ff5'); bg.addColorStop(1, '#a9c8ff');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
   // raggi di luce
@@ -556,7 +556,7 @@ async function renderShareImage() {
   // card
   const cx = 70, cy = 170, cw = W - 140, ch = H - 230;
   ctx.save();
-  ctx.shadowColor = 'rgba(48,36,140,.35)'; ctx.shadowBlur = 60; ctx.shadowOffsetY = 20;
+  ctx.shadowColor = 'rgba(25, 60, 150,.35)'; ctx.shadowBlur = 60; ctx.shadowOffsetY = 20;
   roundRect(ctx, cx, cy, cw, ch, 56); ctx.fillStyle = '#fff'; ctx.fill();
   ctx.restore();
 
@@ -564,7 +564,7 @@ async function renderShareImage() {
   ctx.save();
   ctx.beginPath(); ctx.arc(W / 2, cy, 86, 0, Math.PI * 2);
   const mg = ctx.createLinearGradient(W / 2 - 80, cy - 80, W / 2 + 80, cy + 80);
-  mg.addColorStop(0, '#2fd1b5'); mg.addColorStop(1, '#7c5cf0');
+  mg.addColorStop(0, '#2fd1b5'); mg.addColorStop(1, '#2563eb');
   ctx.fillStyle = mg; ctx.fill();
   ctx.lineWidth = 12; ctx.strokeStyle = '#f5b82e'; ctx.stroke();
   ctx.font = '84px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
@@ -572,15 +572,15 @@ async function renderShareImage() {
   ctx.fillText('🏆', W / 2, cy + 6);
   ctx.restore();
 
-  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#1f1c3d';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#16213e';
   ctx.font = `700 92px ${TITLE}`;
-  ctx.fillStyle = '#5a4ad8';
+  ctx.fillStyle = '#2563eb';
   ctx.fillText('CLASSIFICA', W / 2, cy + 200);
-  ctx.fillStyle = '#1f1c3d';
+  ctx.fillStyle = '#16213e';
   ctx.font = `800 46px ${SANS}`;
   ctx.fillText(state.title, W / 2, cy + 270, cw - 80);
-  ctx.fillStyle = '#e9e7f3'; ctx.fillRect(cx + 80, cy + 310, cw - 160, 3);
-  ctx.fillStyle = '#7b7898'; ctx.font = `500 34px ${SANS}`;
+  ctx.fillStyle = '#e3e9f4'; ctx.fillRect(cx + 80, cy + 310, cw - 160, 3);
+  ctx.fillStyle = '#74809a'; ctx.font = `500 34px ${SANS}`;
   ctx.fillText(`${rounds().length} round · ${new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}`, W / 2, cy + 375);
 
   const list = standings();
@@ -598,18 +598,18 @@ async function renderShareImage() {
     const rw = first ? cw + 60 : cw - 80;
     ctx.save();
     if (first) {
-      ctx.shadowColor = 'rgba(124,92,232,.5)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14;
+      ctx.shadowColor = 'rgba(37, 99, 235,.5)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14;
       const g = ctx.createLinearGradient(rx, 0, rx + rw, 0);
-      g.addColorStop(0, '#b39cf7'); g.addColorStop(1, '#8d72ea');
+      g.addColorStop(0, '#6aa6ff'); g.addColorStop(1, '#2e6ae6');
       ctx.fillStyle = g;
     } else {
-      ctx.fillStyle = '#f3f2f9';
+      ctx.fillStyle = '#f1f5fd';
     }
     roundRect(ctx, rx, y, rw, rh, 36); ctx.fill();
     ctx.restore();
 
     const mid = y + rh / 2;
-    const ink = first ? '#fff' : '#1f1c3d';
+    const ink = first ? '#fff' : '#16213e';
     ctx.fillStyle = ink; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
     ctx.font = `900 ${first ? 62 : 50}px ${SANS}`;
     ctx.fillText(String(p.rank), rx + (first ? 80 : 60), mid);
