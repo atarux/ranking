@@ -5,7 +5,7 @@
 const STORE_KEY = 'classifica.v1';
 const VER_KEY = 'classifica.versione';
 const PIN_KEY = 'classifica.pin';
-const APP_VERSION = 13;
+const APP_VERSION = 14;
 
 // Database condiviso su Supabase (tabelle e funzioni in supabase.sql).
 // La chiave "publishable" è fatta per stare nel codice pubblico: i dati li protegge il PIN.
@@ -811,9 +811,13 @@ async function renderShareImage() {
   mg.addColorStop(0, '#2fd1b5'); mg.addColorStop(1, '#2563eb');
   ctx.fillStyle = mg; ctx.fill();
   ctx.lineWidth = 12; ctx.strokeStyle = '#f5b82e'; ctx.stroke();
-  ctx.font = '84px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('🏆', W / 2, cy + 6);
+  // Coppa vettoriale come nel tondo della classifica: un emoji su canvas in Safari può non comparire.
+  const k = 2.6;
+  ctx.translate(W / 2 - 32 * k, cy - 29.5 * k); ctx.scale(k, k);
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#fff';
+  ctx.fill(new Path2D('M20 12h24v8c0 9-5 15-12 15s-12-6-12-15zM29 34h6v7h-6zM25 41h14a3 3 0 0 1 0 6H25a3 3 0 0 1 0-6z'));
+  ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  ctx.stroke(new Path2D('M20 15h-6c0 7 3 11 8 12M44 15h6c0 7-3 11-8 12'));
   ctx.restore();
 
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#16213e';
@@ -897,7 +901,8 @@ $('#btnShareImg').addEventListener('click', async () => {
   if (!shareBlob) await renderShareImage();
   const file = new File([shareBlob], 'classifica.png', { type: 'image/png' });
   if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: state.title }); } catch { /* annullato */ }
+    // Solo il file: con title alcune app (es. WhatsApp) aggiungono anche un testo.
+    try { await navigator.share({ files: [file] }); } catch { /* annullato */ }
   } else {
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(file), download: 'classifica.png' });
     a.click();
