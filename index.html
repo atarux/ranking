@@ -160,6 +160,25 @@
     </div>
   </div>
 
+  <!-- SHEET: PIN (non si chiude: senza PIN non si vedono i dati condivisi) -->
+  <div class="sheet" id="sheetPin" aria-hidden="true">
+    <div class="sheet-backdrop"></div>
+    <div class="sheet-panel" role="dialog" aria-labelledby="pinTitle">
+      <div class="sheet-grip"></div>
+      <div class="sheet-head">
+        <span></span>
+        <h3 id="pinTitle">PIN della classifica</h3>
+        <span></span>
+      </div>
+      <p class="sheet-hint" id="pinHint"></p>
+      <form class="pin-form" id="pinForm">
+        <input id="pinInput" type="password" inputmode="numeric" autocomplete="current-password" maxlength="32" aria-label="PIN">
+        <p class="pin-error" id="pinError" role="alert"></p>
+        <button class="btn primary" type="submit">Entra</button>
+      </form>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status"></div>
 
   <script src="app.js"></script>

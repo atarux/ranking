@@ -3,7 +3,16 @@
 /* ================== Dati ================== */
 
 const STORE_KEY = 'classifica.v1';
-const APP_VERSION = 11;
+const VER_KEY = 'classifica.versione';
+const PIN_KEY = 'classifica.pin';
+const APP_VERSION = 12;
+
+// Database condiviso su Supabase (tabelle e funzioni in supabase.sql).
+// La chiave "publishable" è fatta per stare nel codice pubblico: i dati li protegge il PIN.
+// Se restano vuoti, i dati stanno solo su questo telefono.
+const SUPABASE_URL = '';
+const SUPABASE_KEY = '';
+const CLOUD = Boolean(SUPABASE_URL && SUPABASE_KEY);
 const COLORS = ['#8b7cf6', '#f472b6', '#38bdf8', '#f59e0b', '#34d399', '#fb7185', '#a3e635', '#94a3b8'];
 const EMOJIS = ['🦊', '🐼', '🐯', '🐸', '🐨', '🦁', '🐵', '🐙', '🦄', '🐶', '🐱', '🐻', '🐰', '🐲', '🐧', '🦉',
   '👑', '🚀', '🔥', '⭐️', '⚽️', '🏀', '🎯', '🎲', '🎸', '🍕', '🌵', '👻', '🤖', '😎', '🥷', '🧙'];
@@ -53,11 +62,14 @@ function migrateDefaults(s) {
 }
 
 let state = load();
-if (migrateDefaults(state)) save();
+let version = Number(localStorage.getItem(VER_KEY)) || 0;
+if (migrateDefaults(state)) saveLocal();
 
-function save() {
+// Copia locale: la classifica si vede subito, anche offline.
+function saveLocal() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    localStorage.setItem(VER_KEY, String(version));
   } catch {
     toast('Memoria piena: prova a usare foto più piccole');
   }
@@ -65,6 +77,147 @@ function save() {
 
 // Chiede al browser di non cancellare i dati in caso di poco spazio.
 navigator.storage?.persist?.().catch(() => {});
+
+/* ================== Sincronizzazione ================== */
+
+let pin = CLOUD ? localStorage.getItem(PIN_KEY) : null;
+let base = JSON.stringify(state); // ultimo stato confermato dal server
+let pending = [];                 // modifiche di questo telefono non ancora sul server
+let syncing = null;
+
+// Ogni modifica passa da qui: si vede subito e poi parte verso il server.
+// mutate(s) cambia lo stato s oppure ne restituisce uno nuovo; se un altro telefono
+// ha salvato nel frattempo, viene riapplicata sui suoi dati.
+function change(mutate) {
+  state = mutate(state) ?? state;
+  saveLocal();
+  renderAll();
+  if (CLOUD) {
+    pending.push(mutate);
+    sync();
+  }
+}
+
+async function rpc(fn, args) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) throw new Error(`Server: ${res.status}`);
+  const out = await res.json();
+  if (out.errore === 'pin' || out.errore === 'troppi_tentativi') {
+    throw Object.assign(new Error(out.errore), { code: out.errore });
+  }
+  return out;
+}
+
+function applyServer(dati, ver) {
+  version = ver;
+  base = JSON.stringify(dati);
+  state = JSON.parse(base);
+  for (const m of pending) {
+    try { state = m(state) ?? state; } catch { /* la modifica non ha senso sui nuovi dati */ }
+  }
+  saveLocal();
+  renderAll();
+}
+
+function sync() {
+  if (!pin) return Promise.resolve();
+  syncing ??= push().finally(() => { syncing = null; });
+  return syncing;
+}
+
+async function push() {
+  try {
+    for (let conflicts = 0; pending.length;) {
+      const sent = pending.length;
+      const snap = JSON.stringify(state);
+      const out = await rpc('salva_classifica', { p_pin: pin, p_dati: state, p_versione: version });
+      if (out.errore === 'conflitto') {
+        if (++conflicts > 5) throw new Error('conflitto');
+        // Server vuoto (es. database ricreato): si ricarica la classifica di questo telefono.
+        if (!isValidState(out.dati)) version = 0;
+        else applyServer(out.dati, out.versione);
+        continue;
+      }
+      version = out.versione;
+      base = snap;
+      pending.splice(0, sent);
+      saveLocal();
+    }
+  } catch (e) {
+    // Senza conferma dal server si torna all'ultimo stato salvato,
+    // così questo telefono non mostra punti che gli altri non vedono.
+    pending = [];
+    state = JSON.parse(base);
+    saveLocal();
+    renderAll();
+    syncError(e, 'Nessuna connessione: modifica non salvata');
+  }
+}
+
+async function pull() {
+  if (!pin || syncing || pending.length) return;
+  try {
+    const out = await rpc('leggi_classifica', { p_pin: pin });
+    if (syncing || pending.length) return; // nel frattempo è partita una modifica: vince quella
+    if (!isValidState(out.dati)) {
+      // Server ancora vuoto: si parte dalla classifica di questo telefono.
+      version = 0;
+      change(s => s);
+    } else if (JSON.stringify(out.dati) !== JSON.stringify(state) || out.versione !== version) {
+      applyServer(out.dati, out.versione);
+    }
+  } catch (e) {
+    syncError(e); // offline si continua a vedere la copia locale
+  }
+}
+
+function syncError(e, offlineMsg) {
+  if (e.code === 'pin') {
+    pin = null;
+    localStorage.removeItem(PIN_KEY);
+    askPin('Il PIN è cambiato: inseriscilo di nuovo');
+  } else if (e.code === 'troppi_tentativi') {
+    toast('Troppi PIN sbagliati: riprova tra 15 minuti');
+  } else if (offlineMsg) {
+    toast(offlineMsg);
+  }
+}
+
+function askPin(hint) {
+  $('#pinHint').textContent = hint;
+  $('#pinError').textContent = '';
+  $('#pinInput').value = '';
+  openSheet('#sheetPin');
+}
+
+$('#pinForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const value = $('#pinInput').value.trim();
+  if (!value) return;
+  const btn = $('#pinForm button');
+  btn.disabled = true;
+  try {
+    await rpc('leggi_classifica', { p_pin: value });
+    pin = value;
+    localStorage.setItem(PIN_KEY, pin);
+    pending = [];
+    $('#pinInput').blur();
+    closeSheet('#sheetPin');
+    await pull();
+    toast('Classifica collegata ✓');
+  } catch (err) {
+    $('#pinError').textContent =
+      err.code === 'pin' ? 'PIN sbagliato' :
+      err.code === 'troppi_tentativi' ? 'Troppi tentativi: riprova tra 15 minuti' :
+      'Nessuna connessione: riprova';
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 /* ================== Calcoli ================== */
 
@@ -346,9 +499,8 @@ $('#statsBody').addEventListener('click', e => {
   const btn = e.target.closest('[data-del]');
   if (!btn) return;
   if (!confirm('Eliminare questa voce? I punti verranno ricalcolati.')) return;
-  state.history = state.history.filter(h => h.id !== btn.dataset.del);
-  save();
-  renderAll();
+  const id = btn.dataset.del;
+  change(s => { s.history = s.history.filter(h => h.id !== id); });
   toast('Voce eliminata');
 });
 
@@ -407,11 +559,10 @@ $('#btnSaveRound').addEventListener('click', () => {
   }
   const deltas = Object.fromEntries(state.players.map(p => [p.id, 0]));
   picks.forEach((id, i) => { deltas[id] = PLACE_POINTS[i]; });
-  state.history.push({ id: uid(), ts: Date.now(), type: 'round', deltas });
-  save();
+  const round = { id: uid(), ts: Date.now(), type: 'round', deltas };
   closeSheet('#sheetUpdate');
   go('ranking');
-  renderAll();
+  change(s => { s.history.push(round); });
   toast('Round salvato ✓');
 });
 
@@ -434,18 +585,17 @@ function renderEdit() {
 }
 
 $('#titleInput').addEventListener('change', e => {
-  state.title = e.target.value.trim() || 'Classifica';
-  save();
-  renderAll();
+  const title = e.target.value.trim() || 'Classifica';
+  change(s => { s.title = title; });
 });
 
 $('#editPlayers').addEventListener('change', e => {
   const card = e.target.closest('[data-id]');
-  const p = state.players.find(x => x.id === card.dataset.id);
+  const id = card.dataset.id;
+  const p = state.players.find(x => x.id === id);
   if (e.target.dataset.field === 'name') {
-    p.name = e.target.value.trim() || p.name;
-    save();
-    renderAll();
+    const name = e.target.value.trim() || p.name;
+    change(s => { s.players.find(x => x.id === id).name = name; });
     toast('Nome aggiornato');
   }
   if (e.target.dataset.field === 'points') {
@@ -453,9 +603,8 @@ $('#editPlayers').addEventListener('change', e => {
     const current = totals()[p.id];
     if (!Number.isFinite(wanted) || wanted === current) { e.target.value = current; return; }
     // La modifica diretta diventa una "correzione" nello storico, così le statistiche restano coerenti.
-    state.history.push({ id: uid(), ts: Date.now(), type: 'adjust', deltas: { [p.id]: wanted - current } });
-    save();
-    renderAll();
+    const adjust = { id: uid(), ts: Date.now(), type: 'adjust', deltas: { [id]: wanted - current } };
+    change(s => { s.history.push(adjust); });
     toast(`Punti di ${p.name} impostati a ${fmt(wanted)}`);
   }
 });
@@ -467,9 +616,7 @@ $('#editPlayers').addEventListener('click', e => {
 
 $('#btnReset').addEventListener('click', () => {
   if (!confirm('Azzerare tutti i punteggi e lo storico? Nomi e avatar restano.')) return;
-  state.history = [];
-  save();
-  renderAll();
+  change(s => { s.history = []; });
   toast('Classifica azzerata');
 });
 
@@ -494,9 +641,7 @@ $('#importFile').addEventListener('change', async e => {
     const data = JSON.parse(await file.text());
     if (!isValidState(data)) throw new Error();
     if (!confirm('Sostituire i dati attuali con il backup?')) return;
-    state = data;
-    save();
-    renderAll();
+    change(() => structuredClone(data));
     toast('Backup importato');
   } catch {
     toast('File di backup non valido');
@@ -523,12 +668,10 @@ function renderAvatarSheet() {
     `<button data-color="${c}" style="--c:${c}" class="${p.color === c ? 'sel' : ''}" aria-label="Colore ${c}"></button>`).join('');
 }
 
-function updateAvatar(change) {
-  const p = state.players.find(x => x.id === avatarFor);
-  Object.assign(p, change);
-  save();
+function updateAvatar(patch) {
+  const id = avatarFor;
+  change(s => { Object.assign(s.players.find(x => x.id === id), patch); });
   renderAvatarSheet();
-  renderAll();
 }
 
 $('#emojiGrid').addEventListener('click', e => {
@@ -770,7 +913,17 @@ function renderAll() {
 }
 
 renderAll();
-$('#appVersion').textContent = `Versione ${APP_VERSION}`;
+$('#appVersion').textContent = `Versione ${APP_VERSION} · ${CLOUD ? 'dati condivisi online' : 'dati solo su questo telefono'}`;
+
+if (CLOUD) {
+  if (pin) pull();
+  else askPin('Inserisci il PIN condiviso per vedere e aggiornare la classifica');
+  // Ricontrolla il server quando riapri l'app e ogni 30 secondi mentre è aperta.
+  const refresh = () => { if (document.visibilityState === 'visible') pull(); };
+  document.addEventListener('visibilitychange', refresh);
+  window.addEventListener('online', refresh);
+  setInterval(refresh, 30000);
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {}));
