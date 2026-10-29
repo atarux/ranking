@@ -3,7 +3,7 @@
 /* ================== Dati ================== */
 
 const STORE_KEY = 'classifica.v1';
-const APP_VERSION = 7;
+const APP_VERSION = 11;
 const COLORS = ['#8b7cf6', '#f472b6', '#38bdf8', '#f59e0b', '#34d399', '#fb7185', '#a3e635', '#94a3b8'];
 const EMOJIS = ['🦊', '🐼', '🐯', '🐸', '🐨', '🦁', '🐵', '🐙', '🦄', '🐶', '🐱', '🐻', '🐰', '🐲', '🐧', '🦉',
   '👑', '🚀', '🔥', '⭐️', '⚽️', '🏀', '🎯', '🎲', '🎸', '🍕', '🌵', '👻', '🤖', '😎', '🥷', '🧙'];
@@ -90,22 +90,44 @@ function standings(upTo) {
 
 function rounds() { return state.history.filter(h => h.type === 'round'); }
 
+// Posizione di ogni giocatore in un round: chi ha più punti è 1°, chi non ne ha preso nessuno è ultimo.
+function roundPlaces(r) {
+  const n = state.players.length;
+  const pts = state.players.map(p => r.deltas[p.id] || 0);
+  return Object.fromEntries(state.players.map((p, i) =>
+    [p.id, pts[i] > 0 ? 1 + pts.filter(v => v > pts[i]).length : n]));
+}
+
+function placeCounts(id) {
+  const counts = state.players.map(() => 0);
+  for (const r of rounds()) counts[roundPlaces(r)[id] - 1]++;
+  return counts;
+}
+
 function playerStats() {
   const rs = rounds();
   const t = totals();
+  // Chi era primo in classifica generale dopo ogni round (a pari merito lo sono tutti).
+  const leaders = [];
+  state.history.forEach((h, i) => {
+    if (h.type === 'round') leaders.push(new Set(standings(i + 1).filter(r => r.rank === 1).map(r => r.id)));
+  });
   return state.players.map(p => {
     const vals = rs.filter(r => p.id in r.deltas).map(r => r.deltas[p.id]);
     const wins = rs.filter(r => {
       const max = Math.max(...Object.values(r.deltas));
       return max > 0 && r.deltas[p.id] === max;
     }).length;
+    // Record: il maggior numero di round di fila in testa alla classifica generale.
+    let streak = 0, run = 0;
+    for (const l of leaders) { run = l.has(p.id) ? run + 1 : 0; streak = Math.max(streak, run); }
     return {
       ...p,
       total: t[p.id],
       played: vals.length,
       wins,
       avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0,
-      best: vals.length ? Math.max(...vals) : 0,
+      streak,
     };
   });
 }
@@ -236,18 +258,18 @@ function renderStats() {
     <div class="card">
       <h3 class="card-title">Giocatori</h3>
       ${stats.sort((a, b) => b.total - a.total).map(s => `
-        <div class="pstat">
+        <button class="pstat" data-player="${s.id}">
           ${avatarHTML(s)}
           <div>
             <div class="top"><span class="nm">${esc(s.name)}</span><span class="tot">${fmt(s.total)} pt</span></div>
             <div class="mini">
               <span>Vittorie <b>${s.wins}</b></span>
               <span>Media <b>${fmt(s.avg)}</b></span>
-              <span>Record <b>${fmt(s.best)}</b></span>
+              <span>Record <b>${s.streak}</b> di fila</span>
             </div>
             <div class="bar" style="--c:${s.color}"><i style="width:${Math.max(0, s.total) / maxTotal * 100}%"></i></div>
           </div>
-        </div>`).join('')}
+        </button>`).join('')}
     </div>
 
     <div class="card">
@@ -297,7 +319,30 @@ function historyHTML() {
     </div>`).join('');
 }
 
+function openPlayer(id) {
+  const p = state.players.find(x => x.id === id);
+  const counts = placeCounts(id);
+  const max = Math.max(1, ...counts);
+  const total = rounds().length;
+  $('#plTitle').textContent = p.name;
+  $('#plBody').innerHTML = `
+    <div class="av-preview">${avatarHTML(p)}</div>
+    <p class="sheet-hint">Piazzamenti nei ${total} round giocati</p>
+    <div class="histo" style="--c:${p.color}">
+      ${counts.map((c, i) => `
+        <div class="col">
+          <span class="cnt">${c}</span>
+          <div class="track"><i style="height:${c / max * 100}%"></i></div>
+          <span class="lbl">${MEDALS[i] || ''} ${i + 1}°</span>
+          <span class="pct">${total ? Math.round(c / total * 100) : 0}%</span>
+        </div>`).join('')}
+    </div>`;
+  openSheet('#sheetPlayer');
+}
+
 $('#statsBody').addEventListener('click', e => {
+  const pl = e.target.closest('[data-player]');
+  if (pl) { openPlayer(pl.dataset.player); return; }
   const btn = e.target.closest('[data-del]');
   if (!btn) return;
   if (!confirm('Eliminare questa voce? I punti verranno ricalcolati.')) return;
@@ -309,67 +354,60 @@ $('#statsBody').addEventListener('click', e => {
 
 /* ================== Aggiorna punti ================== */
 
-let draft = {};
+// Punti per chi arriva 1°, 2° e 3°: si toccano i giocatori in ordine di arrivo.
+const PLACE_POINTS = [5, 3, 1];
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+let picks = [];
 
 function openUpdate() {
-  draft = Object.fromEntries(state.players.map(p => [p.id, 0]));
+  picks = [];
   const t = totals();
   $('#updRows').innerHTML = standings().map(p => `
-    <div class="upd-row" data-id="${p.id}">
+    <button class="upd-row" data-id="${p.id}">
       ${avatarHTML(p)}
       <div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="cur">${fmt(t[p.id])} pt</div></div>
-      <div class="stepper">
-        <button class="sign" data-act="sign" aria-label="Cambia segno">±</button>
-        <button data-act="dec" aria-label="Meno uno">−</button>
-        <input class="num-input" inputmode="numeric" pattern="[0-9]*" value="0" aria-label="Punti per ${esc(p.name)}">
-        <button data-act="inc" aria-label="Più uno">+</button>
-      </div>
-    </div>`).join('');
+      <span class="place"></span>
+    </button>`).join('');
+  renderPicks();
   openSheet('#sheetUpdate');
 }
 
-function setDraft(row, val) {
-  const id = row.dataset.id;
-  draft[id] = Number.isFinite(val) ? val : 0;
-  const input = row.querySelector('.num-input');
-  input.value = draft[id] > 0 ? '+' + draft[id] : draft[id];
-  input.classList.toggle('pos', draft[id] > 0);
-  input.classList.toggle('neg', draft[id] < 0);
+function renderPicks() {
+  for (const row of $('#updRows').children) {
+    const i = picks.indexOf(row.dataset.id);
+    row.disabled = i >= 0 || picks.length >= PLACE_POINTS.length;
+    row.classList.toggle('picked', i >= 0);
+    row.querySelector('.place').innerHTML = i >= 0 ? `${MEDALS[i]} <b>+${PLACE_POINTS[i]}</b>` : '';
+  }
+  const next = picks.length < PLACE_POINTS.length
+    ? `Tocca chi è arrivato ${picks.length + 1}° (+${PLACE_POINTS[picks.length]} pt)`
+    : 'Podio completo: tocca Salva';
+  $('#updHint').textContent = next;
+  $('#btnResetPicks').hidden = !picks.length;
 }
 
 $('#updRows').addEventListener('click', e => {
-  const btn = e.target.closest('button[data-act]');
-  if (!btn) return;
-  const row = btn.closest('.upd-row');
-  const v = draft[row.dataset.id];
-  if (btn.dataset.act === 'inc') setDraft(row, v + 1);
-  if (btn.dataset.act === 'dec') setDraft(row, v - 1);
-  if (btn.dataset.act === 'sign') setDraft(row, -v);
-});
-$('#updRows').addEventListener('focusin', e => {
-  if (e.target.matches('.num-input')) {
-    const row = e.target.closest('.upd-row');
-    e.target.value = draft[row.dataset.id] ? Math.abs(draft[row.dataset.id]) : '';
-  }
-});
-$('#updRows').addEventListener('focusout', e => {
-  if (!e.target.matches('.num-input')) return;
   const row = e.target.closest('.upd-row');
-  const typed = parseInt(e.target.value.replace(/[^\d]/g, ''), 10) || 0;
-  // Il segno resta quello impostato con ±
-  setDraft(row, draft[row.dataset.id] < 0 ? -typed : typed);
+  // Un giocatore già scelto non si può più toccare.
+  if (!row || row.disabled || picks.includes(row.dataset.id)) return;
+  picks.push(row.dataset.id);
+  renderPicks();
 });
-$('#updRows').addEventListener('keydown', e => {
-  if (e.key === 'Enter') e.target.blur();
+
+$('#btnResetPicks').addEventListener('click', () => {
+  picks = [];
+  renderPicks();
 });
 
 $('#btnSaveRound').addEventListener('click', () => {
-  document.activeElement?.blur?.();
-  if (Object.values(draft).every(v => v === 0)) {
-    toast('Inserisci almeno un punteggio');
+  if (!picks.length) {
+    toast('Tocca chi è arrivato primo');
     return;
   }
-  state.history.push({ id: uid(), ts: Date.now(), type: 'round', deltas: { ...draft } });
+  const deltas = Object.fromEntries(state.players.map(p => [p.id, 0]));
+  picks.forEach((id, i) => { deltas[id] = PLACE_POINTS[i]; });
+  state.history.push({ id: uid(), ts: Date.now(), type: 'round', deltas });
   save();
   closeSheet('#sheetUpdate');
   go('ranking');
@@ -531,8 +569,7 @@ async function resizeImage(file, size) {
 /* ================== Condividi ================== */
 
 function shareText() {
-  const medals = ['🥇', '🥈', '🥉'];
-  const lines = standings().map(p => `${medals[p.rank - 1] || p.rank + '.'} ${p.name} — ${fmt(p.points)} pt`);
+  const lines = standings().map(p => `${MEDALS[p.rank - 1] || p.rank + '.'} ${p.name} — ${fmt(p.points)} pt`);
   return `🏆 ${state.title}\n${lines.join('\n')}\n\n${rounds().length} round · ${new Date().toLocaleDateString('it-IT')}`;
 }
 

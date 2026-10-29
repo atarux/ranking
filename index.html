@@ -117,8 +117,9 @@
         <h3 id="updTitle">Nuovo round</h3>
         <button class="link strong" id="btnSaveRound">Salva</button>
       </div>
-      <p class="sheet-hint">Inserisci i punti guadagnati in questo round (usa ± per sottrarre).</p>
+      <p class="sheet-hint" id="updHint"></p>
       <div id="updRows"></div>
+      <button class="link reset-picks" id="btnResetPicks" hidden>Ricomincia</button>
     </div>
   </div>
 
@@ -142,6 +143,20 @@
       <div class="emoji-grid" id="emojiGrid"></div>
       <h4 class="section-label">Colore</h4>
       <div class="color-row" id="colorRow"></div>
+    </div>
+  </div>
+
+  <!-- SHEET: PIAZZAMENTI GIOCATORE -->
+  <div class="sheet" id="sheetPlayer" aria-hidden="true">
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-labelledby="plTitle">
+      <div class="sheet-grip"></div>
+      <div class="sheet-head">
+        <span></span>
+        <h3 id="plTitle"></h3>
+        <button class="link strong" data-close>Fine</button>
+      </div>
+      <div id="plBody"></div>
     </div>
   </div>
 
