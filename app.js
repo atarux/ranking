@@ -5,7 +5,7 @@
 const STORE_KEY = 'classifica.v1';
 const VER_KEY = 'classifica.versione';
 const PIN_KEY = 'classifica.pin';
-const APP_VERSION = 12;
+const APP_VERSION = 13;
 
 // Database condiviso su Supabase (tabelle e funzioni in supabase.sql).
 // La chiave "publishable" è fatta per stare nel codice pubblico: i dati li protegge il PIN.
@@ -32,7 +32,9 @@ function defaultState() {
       { id: uid(), name: DEFAULT_NAMES[2], emoji: '🐯', color: COLORS[2], photo: null },
       { id: uid(), name: DEFAULT_NAMES[3], emoji: '🐸', color: COLORS[3], photo: null },
     ],
-    // Ogni voce: { id, ts, type: 'round' | 'adjust', deltas: { [playerId]: number } }
+    // Punti a ogni vincitore nelle modalità singola e a squadre.
+    winPoints: 2,
+    // Ogni voce: { id, ts, type: 'round' | 'adjust', mode?: 'classic' | 'single' | 'team', deltas: { [playerId]: number } }
     // I punti di un giocatore sono sempre la somma dei suoi delta.
     history: [],
   };
@@ -242,6 +244,8 @@ function standings(upTo) {
 }
 
 function rounds() { return state.history.filter(h => h.type === 'round'); }
+const roundMode = r => r.mode || 'classic';
+const winPoints = () => Number.isFinite(state.winPoints) ? state.winPoints : 2;
 
 // Posizione di ogni giocatore in un round: chi ha più punti è 1°, chi non ne ha preso nessuno è ultimo.
 function roundPlaces(r) {
@@ -253,7 +257,7 @@ function roundPlaces(r) {
 
 function placeCounts(id) {
   const counts = state.players.map(() => 0);
-  for (const r of rounds()) counts[roundPlaces(r)[id] - 1]++;
+  for (const r of rounds()) if (roundMode(r) === 'classic') counts[roundPlaces(r)[id] - 1]++;
   return counts;
 }
 
@@ -462,7 +466,7 @@ function historyHTML() {
   return items.reverse().map(({ h, no }) => `
     <div class="hist-item">
       <div>
-        <div class="when"><b>${no ? `Round ${no}` : 'Correzione manuale'}</b> · ${dateFmt(h.ts)}</div>
+        <div class="when"><b>${no ? `Round ${no}` : 'Correzione manuale'}</b>${no && roundMode(h) !== 'classic' ? ` · ${MODES[roundMode(h)].label}` : ''} · ${dateFmt(h.ts)}</div>
         <div class="chips">${Object.entries(h.deltas).filter(([id, d]) => byId[id] && d !== 0).map(([id, d]) =>
           `<span class="chip ${d > 0 ? 'pos' : d < 0 ? 'neg' : ''}">${esc(byId[id].name)} ${signed(d)}</span>`).join('')}</div>
       </div>
@@ -476,11 +480,18 @@ function openPlayer(id) {
   const p = state.players.find(x => x.id === id);
   const counts = placeCounts(id);
   const max = Math.max(1, ...counts);
-  const total = rounds().length;
+  const rs = rounds();
+  const total = rs.filter(r => roundMode(r) === 'classic').length;
+  // Nelle modalità singola e a squadre conta solo chi ha vinto.
+  const other = ['single', 'team'].map(m => {
+    const played = rs.filter(r => roundMode(r) === m);
+    const won = played.filter(r => r.deltas[id] > 0).length;
+    return played.length ? `${MODES[m].label}: <b>${won}</b> vinti su ${played.length}` : '';
+  }).filter(Boolean);
   $('#plTitle').textContent = p.name;
   $('#plBody').innerHTML = `
     <div class="av-preview">${avatarHTML(p)}</div>
-    <p class="sheet-hint">Piazzamenti nei ${total} round giocati</p>
+    <p class="sheet-hint">Piazzamenti nei ${total} round classici</p>
     <div class="histo" style="--c:${p.color}">
       ${counts.map((c, i) => `
         <div class="col">
@@ -489,7 +500,8 @@ function openPlayer(id) {
           <span class="lbl">${MEDALS[i] || ''} ${i + 1}°</span>
           <span class="pct">${total ? Math.round(c / total * 100) : 0}%</span>
         </div>`).join('')}
-    </div>`;
+    </div>
+    ${other.length ? `<p class="sheet-hint">${other.join(' · ')}</p>` : ''}`;
   openSheet('#sheetPlayer');
 }
 
@@ -510,9 +522,21 @@ $('#statsBody').addEventListener('click', e => {
 const PLACE_POINTS = [5, 3, 1];
 const MEDALS = ['🥇', '🥈', '🥉'];
 
+// Classica: podio 5/3/1. Singola: un vincitore. A squadre: due vincitori.
+// Nelle ultime due ogni vincitore prende winPoints().
+const MODES = {
+  classic: { label: 'Classica', winners: PLACE_POINTS.length },
+  single: { label: 'Singola', winners: 1 },
+  team: { label: 'A squadre', winners: 2 },
+};
+
+let mode = 'classic';
 let picks = [];
 
+const pickPoints = i => mode === 'classic' ? PLACE_POINTS[i] : winPoints();
+
 function openUpdate() {
+  mode = 'classic';
   picks = [];
   const t = totals();
   $('#updRows').innerHTML = standings().map(p => `
@@ -526,18 +550,35 @@ function openUpdate() {
 }
 
 function renderPicks() {
+  const max = MODES[mode].winners;
+  for (const b of $('#updModes').children) {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on);
+  }
   for (const row of $('#updRows').children) {
     const i = picks.indexOf(row.dataset.id);
-    row.disabled = i >= 0 || picks.length >= PLACE_POINTS.length;
+    row.disabled = i >= 0 || picks.length >= max;
     row.classList.toggle('picked', i >= 0);
-    row.querySelector('.place').innerHTML = i >= 0 ? `${MEDALS[i]} <b>+${PLACE_POINTS[i]}</b>` : '';
+    row.querySelector('.place').innerHTML = i >= 0 ? `${mode === 'classic' ? MEDALS[i] : '🏆'} <b>+${pickPoints(i)}</b>` : '';
   }
-  const next = picks.length < PLACE_POINTS.length
-    ? `Tocca chi è arrivato ${picks.length + 1}° (+${PLACE_POINTS[picks.length]} pt)`
-    : 'Podio completo: tocca Salva';
-  $('#updHint').textContent = next;
+  const pts = winPoints();
+  let hint;
+  if (picks.length >= max) hint = mode === 'classic' ? 'Podio completo: tocca Salva' : mode === 'team' ? 'Squadra completa: tocca Salva' : 'Vincitore scelto: tocca Salva';
+  else if (mode === 'classic') hint = `Tocca chi è arrivato ${picks.length + 1}° (+${PLACE_POINTS[picks.length]} pt)`;
+  else if (mode === 'single') hint = `Tocca il vincitore (+${pts} pt)`;
+  else hint = picks.length ? `Tocca il secondo vincitore (+${pts} pt)` : `Tocca i 2 vincitori (+${pts} pt ciascuno)`;
+  $('#updHint').textContent = hint;
   $('#btnResetPicks').hidden = !picks.length;
 }
+
+$('#updModes').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]');
+  if (!b || b.dataset.mode === mode) return;
+  mode = b.dataset.mode;
+  picks = [];
+  renderPicks();
+});
 
 $('#updRows').addEventListener('click', e => {
   const row = e.target.closest('.upd-row');
@@ -553,13 +594,13 @@ $('#btnResetPicks').addEventListener('click', () => {
 });
 
 $('#btnSaveRound').addEventListener('click', () => {
-  if (!picks.length) {
-    toast('Tocca chi è arrivato primo');
+  if (!picks.length || (mode !== 'classic' && picks.length < MODES[mode].winners)) {
+    toast(mode === 'classic' ? 'Tocca chi è arrivato primo' : mode === 'team' ? 'Scegli i 2 vincitori' : 'Tocca il vincitore');
     return;
   }
   const deltas = Object.fromEntries(state.players.map(p => [p.id, 0]));
-  picks.forEach((id, i) => { deltas[id] = PLACE_POINTS[i]; });
-  const round = { id: uid(), ts: Date.now(), type: 'round', deltas };
+  picks.forEach((id, i) => { deltas[id] = pickPoints(i); });
+  const round = { id: uid(), ts: Date.now(), type: 'round', mode, deltas };
   closeSheet('#sheetUpdate');
   go('ranking');
   change(s => { s.history.push(round); });
@@ -570,6 +611,7 @@ $('#btnSaveRound').addEventListener('click', () => {
 
 function renderEdit() {
   $('#titleInput').value = state.title;
+  $('#winPointsInput').value = winPoints();
   const t = totals();
   $('#editPlayers').innerHTML = state.players.map(p => `
     <div class="card edit-player" data-id="${p.id}">
@@ -587,6 +629,13 @@ function renderEdit() {
 $('#titleInput').addEventListener('change', e => {
   const title = e.target.value.trim() || 'Classifica';
   change(s => { s.title = title; });
+});
+
+$('#winPointsInput').addEventListener('change', e => {
+  const n = parseInt(e.target.value.replace(/\D/g, ''), 10);
+  if (!(n > 0) || n === winPoints()) { e.target.value = winPoints(); return; }
+  change(s => { s.winPoints = n; });
+  toast(`Vittoria singola e a squadre: ${n} pt`);
 });
 
 $('#editPlayers').addEventListener('change', e => {

@@ -50,6 +50,10 @@
           <span>Nome della classifica</span>
           <input id="titleInput" type="text" maxlength="40" autocomplete="off">
         </label>
+        <label class="field">
+          <span>Punti vittoria (singola e a squadre)</span>
+          <input id="winPointsInput" type="text" inputmode="numeric" maxlength="3" autocomplete="off">
+        </label>
       </div>
       <h3 class="section-label">Giocatori</h3>
       <div id="editPlayers"></div>
@@ -116,6 +120,11 @@
         <button class="link" data-close>Annulla</button>
         <h3 id="updTitle">Nuovo round</h3>
         <button class="link strong" id="btnSaveRound">Salva</button>
+      </div>
+      <div class="seg" id="updModes" role="tablist" aria-label="Modalità">
+        <button role="tab" data-mode="classic">Classica</button>
+        <button role="tab" data-mode="single">Singola</button>
+        <button role="tab" data-mode="team">A squadre</button>
       </div>
       <p class="sheet-hint" id="updHint"></p>
       <div id="updRows"></div>

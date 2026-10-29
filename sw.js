@@ -1,5 +1,5 @@
 // Cambia la versione quando modifichi i file, così l'app scarica gli aggiornamenti.
-const CACHE = 'classifica-v12';
+const CACHE = 'classifica-v13';
 const ASSETS = [
   './',
   './index.html',
